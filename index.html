@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anshul Cricket Score</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b1220;color:#eef4ff}
+header{padding:22px 16px;text-align:center;background:linear-gradient(135deg,#111c35,#172b52);border-bottom:1px solid #263a5f}
+h1{margin:0;font-size:28px}.sub{opacity:.75;margin-top:6px;font-size:13px}
+.wrap{max-width:760px;margin:auto;padding:16px}
+.card{background:#121d31;border:1px solid #263a5f;border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 8px 30px #0003}
+label{font-size:13px;opacity:.8}input,button,select{width:100%;padding:12px;border-radius:10px;border:1px solid #304668;background:#0c1628;color:#fff;margin-top:6px}
+button{cursor:pointer;background:#1e6cff;border:0;font-weight:700}button.secondary{background:#243652}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.status{font-size:13px;margin-top:10px;opacity:.8}
+.match{padding:14px 0;border-bottom:1px solid #26344e}.match:last-child{border-bottom:0}
+.teams{font-weight:800;font-size:17px}.score{font-size:25px;font-weight:900;margin:7px 0}.meta{font-size:12px;opacity:.7}
+.live{display:inline-block;padding:4px 8px;border-radius:20px;background:#d92d3f;font-size:11px;font-weight:800;margin-left:7px}
+.note{font-size:12px;line-height:1.5;opacity:.7}
+.hidden{display:none}
+@media(max-width:520px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏏 Anshul Cricket Score</h1>
+  <div class="sub">Simple live cricket score • Personal use</div>
+</header>
+<div class="wrap">
+  <div class="card">
+    <label>CricketData API Key</label>
+    <input id="key" type="password" placeholder="Paste your free API key">
+    <div class="row">
+      <button onclick="saveKey()">Save Key</button>
+      <button class="secondary" onclick="loadScores()">Refresh Score</button>
+    </div>
+    <div id="status" class="status">API key is stored only in this browser.</div>
+  </div>
+
+  <div class="card">
+    <div id="matches">Enter your API key and tap “Refresh Score”.</div>
+  </div>
+
+  <div class="card note">
+    <b>Free API note:</b> This page uses CricketData's Current Matches API.
+    The free plan is limited to 100 API hits/day. For a 4-friend personal page,
+    use manual refresh or a conservative refresh interval so the daily quota is not exhausted.
+    The API provider is not affiliated with ICC, BCCI, IPL or any national board.
+  </div>
+</div>
+
+<script>
+const KEY_STORE="anshul_cricket_api_key";
+const keyInput=document.getElementById("key");
+const statusEl=document.getElementById("status");
+const matchesEl=document.getElementById("matches");
+keyInput.value=localStorage.getItem(KEY_STORE)||"";
+
+function saveKey(){
+  const k=keyInput.value.trim();
+  if(!k){statusEl.textContent="Please enter the API key.";return;}
+  localStorage.setItem(KEY_STORE,k);
+  statusEl.textContent="API key saved on this device. Now tap Refresh Score.";
+}
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function scoreText(m){
+  if(Array.isArray(m.score) && m.score.length){
+    return m.score.map(s=>{
+      const r=s.r ?? s.runs ?? "-";
+      const w=s.w ?? s.wickets ?? "-";
+      const o=s.o ?? s.overs ?? "-";
+      return `${r}/${w} (${o} ov)`;
+    }).join(" &nbsp; • &nbsp; ");
+  }
+  return m.score || "Score unavailable";
+}
+async function loadScores(){
+  const key=keyInput.value.trim() || localStorage.getItem(KEY_STORE);
+  if(!key){statusEl.textContent="Enter the API key first.";return;}
+  statusEl.textContent="Loading live scores…";
+  try{
+    const url=`https://api.cricapi.com/v1/currentMatches?apikey=${encodeURIComponent(key)}&offset=0`;
+    const res=await fetch(url,{cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const data=await res.json();
+    if(data.status && data.status!=="success") throw new Error(data.reason || "API request failed");
+    const list=Array.isArray(data.data)?data.data:[];
+    if(!list.length){matchesEl.innerHTML="<div>No current matches returned.</div>";}
+    else{
+      matchesEl.innerHTML=list.map(m=>`
+        <div class="match">
+          <div class="teams">${esc(m.name||"Cricket Match")} ${m.matchType?`<span class="meta">(${esc(m.matchType)})</span>`:""} ${m.matchStarted && !m.matchEnded?'<span class="live">LIVE</span>':""}</div>
+          <div class="score">${esc(scoreText(m))}</div>
+          <div class="meta">${esc(m.status||"")}</div>
+        </div>`).join("");
+    }
+    statusEl.textContent="Updated: "+new Date().toLocaleTimeString();
+  }catch(e){
+    matchesEl.innerHTML=`<div>Could not load score.<br><br><b>${esc(e.message)}</b><br><br>Check the API key and internet connection.</div>`;
+    statusEl.textContent="Score update failed.";
+  }
+}
+</script>
+</body>
+</html>
